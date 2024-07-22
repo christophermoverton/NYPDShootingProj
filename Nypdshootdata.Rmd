@@ -1,0 +1,371 @@
+---
+title: "NYPDshootingdata"
+author: "Anonymous"
+date: "2024-07-10"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+### Introduction
+
+The analysis of shooting incidents and murders over time is crucial for understanding trends, identifying patterns, and implementing effective policies to improve public safety. By examining the NYPD Shooting Incident Data, aggregated on a monthly and yearly basis, we can gain insights into how these incidents fluctuate over time and across different boroughs. This dataset, provided by the New York Police Department (NYPD), includes detailed information on shooting incidents, including the date of occurrence, borough, and whether the incident resulted in a murder.
+
+This analysis aims to answer the following key questions:
+
+1.  **How do shooting incidents and murders vary month-to-month and year-to-year?**
+2.  **What are the trends and patterns in shooting incidents and murders over time?**
+3.  **How do these trends differ across specific boroughs, such as the Bronx, Queens, and Manhattan?**
+
+To address these questions, we will create visualizations that depict the frequency of shooting incidents and murders, aggregated by month and year. These visualizations will be tailored to highlight yearly trends on the x-axis, ensuring clarity and readability.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Importation
+
+To analyze the NYPD shooting incident dataset, we need to first import the data from the official source provided by the U.S. government's open data catalog. This dataset includes detailed information about shooting incidents in New York City, which can be invaluable for various types of analysis such as crime trends, geographic distribution, and temporal patterns.
+
+We will use R to import this dataset directly from catalog.data.gov using the read.csv function. Below is the R code chunk that accomplishes this:
+
+```{r download_input_data}
+url_link <- "https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD"
+shootng_df <- read.csv(url_link)
+head(shootng_df)
+```
+
+## Update of Data and Summary
+
+In this R script, we perform a series of data transformation steps using the `tidyverse` package to process the NYPD shooting dataset. The main steps include:
+
+1.  **Library Import**: The `tidyverse` package is loaded to provide a suite of data manipulation functions.
+
+2.  **Data Cleaning**:
+
+    -   **Dropping Unnecessary Columns**: Columns from `LOC_OF_OCCUR_DESC` to `Lon_Lat`, along with `OCCUR_TIME` and `INCIDENT_KEY`, are removed from the dataset.
+
+3.  **Data Grouping and Summarization**:
+
+    -   The dataset is grouped by `OCCUR_DATE` and `BORO` (borough).
+    -   The number of shooting incidents is counted for each group and stored in a new column `shooting_incidents`.
+
+4.  **Date Formatting**:
+
+    -   The `OCCUR_DATE` column is converted to a date format (`YYYY-MM-DD`).
+
+5.  **Data Sorting**:
+
+    -   The dataset is sorted by the `OCCUR_DATE` column in ascending order.
+
+6.  **Display**:
+
+    -   The first few rows of the transformed dataset are displayed.
+    -   A summary of the transformed dataset is also provided, giving an overview of its structure and content.
+
+The resulting dataset, `nypd_shooting_data_long`, provides a concise summary of shooting incidents in NYC, grouped by date and borough, with unnecessary details removed for clearer analysis.
+
+```{r update_summary}
+library(tidyverse)
+
+# Convert STATISTICAL_MURDER_FLAG to integer and drop unnecessary columns
+shootng_df2 <- shootng_df %>%
+  mutate(STATISTICAL_MURDER_FLAG = as.logical(STATISTICAL_MURDER_FLAG))
+head(shootng_df2)
+# Summarize data
+nypd_shooting_data_long <- shootng_df2 %>%
+  select(OCCUR_DATE, BORO, STATISTICAL_MURDER_FLAG) %>%
+  group_by(OCCUR_DATE, BORO) %>%
+  summarise(shooting_incidents = n(), 
+            murders = sum(STATISTICAL_MURDER_FLAG, na.rm = TRUE))
+
+# Convert OCCUR_DATE to Date format and arrange by OCCUR_DATE
+nypd_shooting_data_long$OCCUR_DATE <- as.Date(nypd_shooting_data_long$OCCUR_DATE, format = "%m/%d/%Y")
+nypd_shooting_data_long <- nypd_shooting_data_long %>%
+  arrange(OCCUR_DATE)
+
+# Display the first few rows of the transformed dataset
+print(head(nypd_shooting_data_long))
+summary(nypd_shooting_data_long)
+
+```
+
+## New York Boros Monthly and Yearly datasets
+
+Let's create a dataset from nypd_shooting_data_long that has monthly and yearly shooting_incidents and murders per Boro.
+
+The code processes the NYPD shooting data by first adding `month` and `year` columns to the dataset based on the `OCCUR_DATE`. It then summarizes the data to calculate the total number of shooting incidents and murders per borough (`BORO`) for each month and year. The results are stored in two separate data frames: `boro_monthly_totals` for monthly summaries and `boro_yearly_totals` for yearly summaries. Finally, it prints these summarized results.
+
+```{r}
+nypd_shooting_data_long <- nypd_shooting_data_long %>%
+  mutate(
+    month = format(OCCUR_DATE, "%Y-%m"),
+    year = format(OCCUR_DATE, "%Y")
+  )
+# Summarise data per month
+boro_monthly_totals <- nypd_shooting_data_long %>%
+  group_by(BORO,month) %>%
+  summarise(
+    shooting_incidents = sum(shooting_incidents),
+    murders = sum(murders)
+  ) %>%
+  ungroup()
+
+# Summarise data per year
+boro_yearly_totals <- nypd_shooting_data_long %>%
+  group_by(BORO,year) %>%
+  summarise(
+    shooting_incidents = sum(shooting_incidents),
+    murders = sum(murders)
+  ) %>%
+  ungroup()
+
+# Display the results
+print("Boro Monthly Totals")
+print(head(boro_monthly_totals))
+print("Boro Yearly Totals")
+print(head(boro_yearly_totals))
+print(summary(boro_monthly_totals))
+print(summary(boro_yearly_totals))
+```
+
+## New York Shooting Totals Daily
+
+Let's also create another dataset that includes total shooting incidents per day in New York We will use the group_by function to group by date.
+
+The code processes the NYPD shooting data by summarizing the total number of shooting incidents and murders for each occurrence date (`OCCUR_DATE`). The summarized results are stored in a new data frame called `nypd_shooting_totals`. Finally, it prints a summary of the results.
+
+```{r create shooting_totals}
+nypd_shooting_totals <- nypd_shooting_data_long %>% 
+  group_by(OCCUR_DATE) %>%
+  summarise(shooting_incidents = sum(shooting_incidents), murders = sum(murders)) %>%
+  select(OCCUR_DATE, shooting_incidents, murders) %>%
+  ungroup()
+summary(nypd_shooting_totals)
+```
+
+## New York Shooting Totals by Month and Year
+
+Let's create another data of nypd shootings per month from this nypd_shooting_totals dataset. The code processes the NYPD shooting data by first adding `month` and `year` columns to the `nypd_shooting_totals` dataset based on the `OCCUR_DATE`. It then summarizes the data to calculate the total number of shooting incidents and murders for each month and year. The results are stored in two separate data frames: `monthly_totals` for monthly summaries and `yearly_totals` for yearly summaries. Finally, it prints these summarized results.
+
+```{r}
+
+# Add month and year columns
+nypd_shooting_totals <- nypd_shooting_totals %>%
+  mutate(
+    month = format(OCCUR_DATE, "%Y-%m"),
+    year = format(OCCUR_DATE, "%Y")
+  )
+
+# Summarise data per month
+monthly_totals <- nypd_shooting_totals %>%
+  group_by(month) %>%
+  summarise(
+    shooting_incidents = sum(shooting_incidents),
+    murders = sum(murders)
+  ) %>%
+  ungroup()
+
+# Summarise data per year
+yearly_totals <- nypd_shooting_totals %>%
+  group_by(year) %>%
+  summarise(
+    shooting_incidents = sum(shooting_incidents),
+    murders = sum(murders)
+  ) %>%
+  ungroup()
+
+# Display the results
+print("Monthly Totals")
+print(head(monthly_totals))
+print("Yearly Totals")
+print(head(yearly_totals))
+
+```
+
+## Plotting NYPD Shooting Incidents and Murders Over Time for Specific Boroughs
+
+Let's create histograms of shooting data by boro we will pick the Bronx, Manhattan, and Queens. The code processes and visualizes NYPD shooting data by converting it into a long format for easier plotting. It then filters the data for specified boroughs and plots separate histograms for shooting incidents and murders over time. The specified boroughs are the Bronx, Queens, and Manhattan. The histograms are plotted with the date on the x-axis and the count on the y-axis, with separate facets for each borough and type of incident (shooting incidents or murders).
+
+```{r Plotting Shootings per Boro per Day}
+
+# Convert the data into a long format for easier plotting
+nypd_shooting_data_long_long <- nypd_shooting_data_long %>%
+  pivot_longer(cols = c(shooting_incidents, murders), names_to = "type", values_to = "count")
+
+# Define the boroughs
+boro <- c("BRONX", "QUEENS", "MANHATTAN")
+
+# Plotting separate histograms for specified boroughs
+nypd_shooting_data_long_long %>% 
+  filter(BORO %in% boro) %>%
+  ggplot(aes(x = OCCUR_DATE, y = count, fill = type)) +
+  geom_histogram(stat = "identity", position = "dodge") +
+  facet_grid(BORO ~ type, scales = "free_y") +
+  labs(title = str_c("Histogram of Shooting Incidents and Murders Over Time in ", str_c(boro, collapse = ", ")),
+       x = "Date",
+       y = "Count",
+       fill = "Type") +
+  theme_minimal()
+
+
+```
+
+## Monthly Histogram of NYPD Shooting Incidents and Murders for Specific Boroughs
+
+Let's create a histogram of Shooting totals per month per Boro. The code processes and visualizes NYPD shooting data by converting the month column to a Date type, transforming the data into a long format, and plotting separate histograms for specified boroughs (Bronx, Queens, and Manhattan). The histograms show monthly totals of shooting incidents and murders over time.
+
+```{r}
+# Convert the month column to Date type
+boro_monthly_totals <- boro_monthly_totals %>%
+  mutate(month = as.Date(paste0(month, "-01"), format = "%Y-%m-%d")) 
+
+# Convert the data into a long format for easier plotting
+nypd_shooting_data_long_long <- boro_monthly_totals %>%
+  pivot_longer(cols = c(shooting_incidents, murders), names_to = "type", values_to = "count")
+
+# Define the boroughs
+boro <- c("BRONX", "QUEENS", "MANHATTAN")
+
+# Plotting separate histograms for specified boroughs
+nypd_shooting_data_long_long %>% 
+  filter(BORO %in% boro) %>%
+  ggplot(aes(x = month, y = count, fill = type)) +
+  geom_histogram(stat = "identity", position = "dodge") +
+  facet_grid(BORO ~ type, scales = "free_y") +
+  labs(title = str_c("Histogram of Shooting Incidents and Murders Over Time (monthly) in ", str_c(boro, collapse = ", ")),
+       x = "Date",
+       y = "Count",
+       fill = "Type") +
+  theme_minimal() +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 6))
+```
+
+## Yearly Histogram of NYPD Shooting Incidents and Murders for Specific Boroughs
+
+Let's do the same for above yearly shooting_incidents and murders. The code processes and visualizes NYPD shooting data by converting it into a long format for easier plotting. It then filters the data for specified boroughs (Bronx, Queens, and Manhattan) and plots separate histograms for shooting incidents and murders over time on a yearly basis.
+
+```{r}
+# Convert the data into a long format for easier plotting
+nypd_shooting_data_long_long <- boro_yearly_totals %>%
+  pivot_longer(cols = c(shooting_incidents, murders), names_to = "type", values_to = "count")
+
+# Define the boroughs
+boro <- c("BRONX", "QUEENS", "MANHATTAN")
+
+# Plotting separate histograms for specified boroughs
+nypd_shooting_data_long_long %>% 
+  filter(BORO %in% boro) %>%
+  ggplot(aes(x = year, y = count, fill = type)) +
+  geom_histogram(stat = "identity", position = "dodge") +
+  facet_grid(BORO ~ type, scales = "free_y") +
+  labs(title = str_c("Histogram of Shooting Incidents and Murders Over Time (yearly) in ", str_c(boro, collapse = ", ")),
+       x = "Date",
+       y = "Count",
+       fill = "Type") +
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 6))
+```
+
+## Histogram of NYPD Shooting Incidents and Murders Over Time
+
+Let's create a plot of Shooting totals in New York with a histogram. The code processes and visualizes NYPD shooting data by converting it into a long format for easier plotting. It then plots histograms of shooting incidents and murders over time.
+
+```{r shooting totals histogram}
+# Convert the data into a long format for easier plotting
+nypd_shooting_totals_long <- nypd_shooting_totals %>%
+  pivot_longer(cols = c(shooting_incidents, murders), names_to = "type", values_to = "count")
+
+# Plotting histograms
+nypd_shooting_totals_long %>%
+  ggplot(aes(x = OCCUR_DATE, y = count, fill = type)) +
+  geom_histogram(stat = "identity", position = "dodge") +
+  facet_wrap(~ type, scales = "free_y") +
+  labs(title = "Histogram of Shooting Incidents and Murders Over Time",
+       x = "Date",
+       y = "Count",
+       fill = "Type") +
+  theme_minimal()
+
+```
+
+## Monthly Histogram of NYPD Shooting Incidents and Murders
+
+The code processes and visualizes NYPD shooting data by converting it into a long format for easier plotting. It then plots histograms of shooting incidents and murders over time on a monthly basis, with only year tick labels on the x-axis.
+
+Let's see the monthly data per year for total shooting_incidents and murders
+
+```{r}
+# Convert the data into a long format for easier plotting
+nypd_shooting_totals_long <- monthly_totals %>%
+  mutate(month = as.Date(paste0(month, "-01"))) %>%
+  pivot_longer(cols = c(shooting_incidents, murders), names_to = "type", values_to = "count")
+
+# Plotting histograms with only year tick labels
+nypd_shooting_totals_long %>%
+  ggplot(aes(x = month, y = count, fill = type)) +
+  geom_histogram(stat = "identity", position = "dodge") +
+  facet_wrap(~ type, scales = "free_y") +
+  labs(title = "Histogram of Shooting Incidents and Murders Over Time (Monthly)",
+       x = "Year",
+       y = "Count",
+       fill = "Type") +
+  theme_minimal() +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 6))
+```
+
+## Yearly Histogram of NYPD Shooting Incidents and Murders\*\*
+
+The code processes and visualizes NYPD shooting data by converting it into a long format for easier plotting. It then plots histograms of shooting incidents and murders over time on a yearly basis, with improved x-axis labels.
+
+Finally let's look at the New York year shooting_incidents and murders with a histogram plot
+
+```{r}
+# Convert the data into a long format for easier plotting
+nypd_shooting_totals_long <- yearly_totals %>%
+  pivot_longer(cols = c(shooting_incidents, murders), names_to = "type", values_to = "count")
+
+# Plotting histograms with improved x-axis labels
+nypd_shooting_totals_long %>%
+  ggplot(aes(x = year, y = count, fill = type)) +
+  geom_histogram(stat = "identity", position = "dodge") +
+  facet_wrap(~ type, scales = "free_y") +
+  labs(title = "Histogram of Shooting Incidents and Murders Over Time (Yearly)",
+       x = "Year",
+       y = "Count",
+       fill = "Type") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8))
+```
+
+## Linear Regression Analysis of Murders vs Shooting Incidents
+
+The code fits a linear regression model to analyze the relationship between murders and shooting incidents using the `yearly_totals` dataset. It then provides a summary of the model and plots the regression line along with the data points.
+
+Let's do a simple linear model
+
+```{r}
+# Fit linear regression model
+lm_model <- lm(murders ~ shooting_incidents, data = yearly_totals)
+
+# Summary of the model
+summary(lm_model)
+
+# Plot the regression
+ggplot(yearly_totals, aes(x = shooting_incidents, y = murders)) +
+  geom_point() +
+  geom_smooth(method = "lm", col = "red") +
+  labs(title = "Linear Regression: Murders vs Shooting Incidents", x = "Shooting Incidents", y = "Murders")
+
+```
+
+## Possible Biases
+
+**Geographic Bias** Worth noting that the data is based upon NYPD's furnished data. Potential Geographic Biases may apply in so far as differences in policing from one borough relative another which could have an impact on the data.\
+**Algorithmic Bias** Linear modeling in this case may not adequately capture non linearity between variables presented.
+
+## Conclusion
+
+Between Shooting_Incidents and Murders there is a linear relationship. In conclusion, there is a strong correlation that reducing gun violence reduces gun related homicides as one would expect. The guns appear not to be any more or less lethal over the gun violence related time series.
